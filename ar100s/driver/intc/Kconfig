@@ -1,0 +1,12 @@
+choice IRQCHIP_IP
+	prompt "Sunxi irqchip to use"
+
+config OPENRISC_INTC_USED
+	bool
+	prompt "openrisc intc used"
+
+config CLIC_USED
+	bool
+	prompt "clic used"
+
+endchoice

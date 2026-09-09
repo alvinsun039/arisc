@@ -1,0 +1,56 @@
+menuconfig PMU_USED
+	bool
+	prompt "PMU used"
+	default y
+
+if PMU_USED
+
+config AXP803_USED
+	bool "AXP803 used"
+
+config AXP2202_USED
+	bool "AXP2202 used"
+
+config AXP806_USED
+	bool "AXP806 used"
+
+config AXP858_USED
+	bool "AXP858 used"
+
+config AXP8191_USED
+	bool "AXP8191 used"
+
+config AXP1530_USED
+	bool "AXP1530 used"
+
+config PMU_EXT_USED
+	bool "pmu_ext used"
+
+config PMU_POWER_CHECK
+	bool "pmu power check"
+
+config PMU_IRQ_CHECK
+	bool "pmu irq check"
+
+endif # PMU_USED
+
+menuconfig BMU_USED
+	bool
+	prompt "BMU used"
+	default n
+
+if BMU_USED
+
+config ETA6973_USED
+	bool "bmu eta6973 used"
+
+config AXP519_USED
+	bool "bmu axp519 used"
+
+config AXP515_USED
+	bool "bmu axp515 used"
+
+config AXP517_USED
+	bool "bmu axp517 used"
+
+endif # BMU_USED

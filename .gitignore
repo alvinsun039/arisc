@@ -1,0 +1,14 @@
+.config
+.*
+ar100s-private/
+arisc_key
+arisc_source/
+patch/
+*.patch
+!*.tar.gz
+!*.tar.bz2
+*/ram.ld
+GPATH
+GRTAGS
+GTAGS
+tags

@@ -1,0 +1,4 @@
+menuconfig GPADC_USED
+	bool
+	prompt "GPADC driver used"
+

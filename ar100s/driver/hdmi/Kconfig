@@ -1,0 +1,13 @@
+config HDMI_USED
+	def_bool n
+	prompt "HDMI used"
+
+config HDMIRX_USED
+	def_bool n
+	depends on HDMI_USED
+	prompt "HDMIRX used"
+
+config HDMITX_USED
+	def_bool n
+	depends on HDMI_USED
+	prompt "HDMITX used"

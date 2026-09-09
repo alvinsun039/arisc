@@ -1,0 +1,3 @@
+menuconfig FAKE_POWER_OFF
+	bool
+	prompt "support fake_power_off"

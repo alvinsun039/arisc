@@ -1,0 +1,17 @@
+obj-y += cpucfg/
+obj-y += prcm/
+obj-y += intc/
+obj-y += pin/
+obj-y += timer/
+obj-y += uart/
+obj-$(CFG_TWI_USED) += twi/
+obj-y += hwmsgbox/
+obj-$(CFG_HDMI_USED) += hdmi/
+obj-y += dram/
+obj-$(CFG_PMU_USED) += pmu/
+obj-$(CFG_WATCHDOG_USED) += watchdog/
+obj-$(CFG_IR_USED) += ir/
+obj-y += smc/
+obj-$(CFG_NDMA_USED) += ndma/
+obj-$(CFG_GPIO_POWERKEY_USED) += gpio_powerkey/
+obj-$(CFG_GPADC_USED) += gpadc/

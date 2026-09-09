@@ -1,0 +1,1 @@
+obj-y += fake_power_off.o
