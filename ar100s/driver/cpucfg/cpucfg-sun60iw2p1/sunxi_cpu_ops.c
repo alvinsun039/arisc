@@ -1,4 +1,10 @@
 /*
+ * A733 changes: Copyright (c) 2026 A733 contributors.
+ * These changes are provided under BSD-3-Clause (see LICENSE); the
+ * original file retains its upstream copyright and terms.
+ */
+
+/*
  * Copyright (c) 2020, Allwinner. All rights reserved.
  *
  * Author: Fan Qinghua <fanqinghua@allwinnertech.com>
@@ -84,12 +90,18 @@ void cpucfg_cpu_suspend(void)
 /*init pll_cpu*/
 int cpucfg_cpu_resume(unsigned int resume_addr)
 {
-	/*set cpu boot addr*/
+	/* bp168: the boot address/RVBAR loses its value while the core
+	 * domain is powered off, so it MUST be programmed after the
+	 * domain power is enabled (HOTPLUG_EN) but before the core is
+	 * released (POWER_ON).  The old order (RVBAR write before any
+	 * power) silently lost the boot address on resume. */
+	mmio_setbits_32(HOTPLUG_CONTROL_REG(0), HOTPLUG_EN);
 	sunxi_set_bootaddr(0, 0, resume_addr);
-	/*set cpu0 to aarch64*/
 	sunxi_init_archstate(0, 0, 1);
-	/*power on cpu0*/
-	sunxi_poweron_cpu(0, 0);
+	mmio_setbits_32(HOTPLUG_POWERMODE_REG(0), POWER_ON);
+	while (!sunxi_get_cpu_powerstate(0, 0)) {
+	}
+	mmio_clrbits_32(HOTPLUG_CONTROL_REG(0), HOTPLUG_EN);
 
 	return 0;
 }

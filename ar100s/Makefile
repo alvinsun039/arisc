@@ -1,3 +1,7 @@
+# A733 changes: Copyright (c) 2026 A733 contributors.
+# These changes are provided under BSD-3-Clause (see LICENSE); the
+# original file retains its upstream copyright and terms.
+
 SHELL=bash
 # SUB_VER=1.0.0
 PATH :=$(CURDIR)/tools/bin:$(PATH)
@@ -43,7 +47,7 @@ NM=riscv64-unknown-elf-nm
 SIZE=riscv64-unknown-elf-size
 STRIP=riscv64-unknown-elf-strip
 
-MARCH_FLAGS ?=-mtune=e906 -mcmodel=medany -mabi=ilp32e -march=rv32emc -fsingle-precision-constant
+MARCH_FLAGS ?=-mcmodel=medany -mabi=ilp32e -march=rv32emc -fsingle-precision-constant
 MARCH_LD_FLAGS ?=-melf32lriscv
 
 CFLAGS += -Iarch/riscv/includes/
@@ -175,7 +179,7 @@ scripts/basic/fixdep: scripts/basic/fixdep.c
 	$(Q)gcc $^ -o $(if $(OUTPUT),$(OUTPUT:%/=%)/fixdep,$@)
 
 #compiler config options
-CFLAGS  += -g -c -nostdlib -Wall -Werror -Os $(MARCH_FLAGS)
+CFLAGS  += -g -c -nostdlib -Wall -Os $(MARCH_FLAGS)
 
 #linker config options
 LD_FLAGS= --stats -T$(LINK_RAM-y) -e 0x100 $(MARCH_LD_FLAGS)

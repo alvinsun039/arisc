@@ -1,0 +1,57 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch the T-HEAD toolchain
+        env:
+          ARISC_TOOLS_URL: ${{ vars.ARISC_TOOLS_URL }}
+        run: |
+          if [ -z "$ARISC_TOOLS_URL" ]; then
+            echo "::error::set the ARISC_TOOLS_URL repository variable to the T-HEAD XuanTie V1.10.2 tarball"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/tools"
+          curl -L --fail --retry 3 -o "$RUNNER_TEMP/tools.tar.gz" "$ARISC_TOOLS_URL"
+          tar xzf "$RUNNER_TEMP/tools.tar.gz" -C "$RUNNER_TEMP/tools"
+          cc=$(find "$RUNNER_TEMP/tools" -name riscv64-unknown-elf-gcc | head -1)
+          if [ -z "$cc" ]; then
+            echo "::error::riscv64-unknown-elf-gcc not found in the toolchain tarball"
+            exit 1
+          fi
+          echo "ARISC_TOOLS=$(dirname "$cc")" >> "$GITHUB_ENV"
+
+      - name: Fetch the ARISC OEM library
+        run: |
+          git clone https://github.com/radxa/allwinner-dramlib.git \
+            "$RUNNER_TEMP/allwinner-dramlib"
+          git -C "$RUNNER_TEMP/allwinner-dramlib" checkout b1c31a9
+          echo "LICHEE_DRAMLIB_PATH=$RUNNER_TEMP/allwinner-dramlib" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Check the firmware
+        run: |
+          test -s ar100s/scp.bin
+          stat -c '%n: %s bytes' ar100s/scp.bin
+          sha256sum ar100s/scp.bin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arisc-a733-scp
+          path: ar100s/scp.bin
+          if-no-files-found: error

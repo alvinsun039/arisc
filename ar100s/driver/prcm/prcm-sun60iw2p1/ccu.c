@@ -1,4 +1,10 @@
 /*
+ * A733 changes: Copyright (c) 2026 A733 contributors.
+ * These changes are provided under BSD-3-Clause (see LICENSE); the
+ * original file retains its upstream copyright and terms.
+ */
+
+/*
 *********************************************************************************************************
 *                                                AR100 SYSTEM
 *                                     AR100 Software System Develop Kits
@@ -119,6 +125,7 @@ s32 ccu_exit(void)
 {
 	return OK;
 }
+
 
 void save_state_flag(u32 value)
 {
