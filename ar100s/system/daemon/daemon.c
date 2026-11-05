@@ -1,4 +1,10 @@
 /*
+ * A733 changes: Copyright (c) 2026 A733 contributors.
+ * These changes are provided under BSD-3-Clause (see LICENSE); the
+ * original file retains its upstream copyright and terms.
+ */
+
+/*
 *********************************************************************************************************
 *                                                AR100 SYSTEM
 *                                     AR100 Software System Develop Kits
@@ -76,9 +82,17 @@ static void message_process_loop(void)
 
 	message.paras = msg_paras;
 
-	ret = hwmsgbox_query_message(&message, 0);
-	if (ret == OK)
-		message_coming_notify(&message);
+	/* Standby single-consumer rule: during suspend entry/exit the
+	 * standby task's wait_cpu0_resume() owns the mailbox (it waits
+	 * for the 0x11 resume notify).  Two concurrent consumers race
+	 * for frames and the 0x11 gets lost/stolen -> resume never
+	 * completes.  The daemon pump resumes after standby_process_exit
+	 * clears the lock. */
+	if (!is_suspend_lock()) {
+		ret = hwmsgbox_query_message(&message, 0);
+		if (ret == OK)
+			message_coming_notify(&message);
+	}
 
 	amp_msgbox_query_message();
 }

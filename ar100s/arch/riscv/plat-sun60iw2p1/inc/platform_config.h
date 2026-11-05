@@ -1,4 +1,10 @@
 /*
+ * A733 changes: Copyright (c) 2026 A733 contributors.
+ * These changes are provided under BSD-3-Clause (see LICENSE); the
+ * original file retains its upstream copyright and terms.
+ */
+
+/*
  * include/cfgs.h
  *
  * Descript: system configure header.
@@ -32,7 +38,7 @@
 #define RSB_RTSADDR_AXP517_01	(0x35)
 
 /* uart config */
-#define UART_BAUDRATE		(115200 / 2)
+#define UART_BAUDRATE		(115200)
 
 /* devices define */
 #define ARISC_DTS_SIZE		(0x00100000)

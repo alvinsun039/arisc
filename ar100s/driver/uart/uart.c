@@ -1,4 +1,10 @@
 /*
+ * A733 changes: Copyright (c) 2026 A733 contributors.
+ * These changes are provided under BSD-3-Clause (see LICENSE); the
+ * original file retains its upstream copyright and terms.
+ */
+
+/*
  * drivers/uart/uart.c
  *
  * Copyright (C) 2012-2016 AllWinnertech Ltd.
@@ -16,6 +22,25 @@ static int s_uart_num;
 extern u32 dtb_base;
 
 #define IS_TX_FIFO_EMPTY  (readl(UART_REG_USR) & (0x1 << 2))
+
+/* bp135: bounded wait for the TX fifo to drain.  The stock code spins
+ * forever (CLKCHG_REQ runs at clk_suspend while the console is still
+ * printing its own logs, so the FIFO never empties -> the S-domain
+ * clock switch stalls ~10s and the standby timing collapses).
+ * bp152: the bound must exceed the REQ printout burst (twi + uart
+ * request lines = ~53 bytes = ~3.7ms @115200); with the daemon silenced
+ * during standby (bp151) the FIFO only drains, so a long bound waits
+ * for true emptiness.  1000000 iterations >> 10ms on the E902. */
+static s32 uart_wait_tx_drained(void)
+{
+	unsigned int i;
+
+	for (i = 0; i < 1000000U; i++) {
+		if (IS_TX_FIFO_EMPTY)
+			return 0;
+	}
+	return -EBUSY;
+}
 
 #ifdef CFG_FDT_INIT_ARISC_UART_USED
 static s32 uart_init_from_dts(void)
@@ -87,9 +112,8 @@ s32 uart_clkchangecb(u32 command, u32 freq)
 		{
 			/* clock will be change */
 			INF("uart source clock change request\n");
-			/* wait uart transmit fifo empty */
-			while (!IS_TX_FIFO_EMPTY)
-				continue;
+			/* wait uart transmit fifo empty (bounded, bp135) */
+			(void)uart_wait_tx_drained();
 			/* lock uart */
 			uart_lock = 1;
 			return OK;
@@ -121,10 +145,14 @@ s32 uart_init(void)
 
 	uart_rate = UART_BAUDRATE;
 #ifndef CFG_FDT_INIT_ARISC_UART_USED
-	if (!uart_pin_not_used) {
-		pin_set_multi_sel(PIN_GRP_PL, 2, 2);
-		pin_set_multi_sel(PIN_GRP_PL, 3, 2);
-	}
+	/*
+	 * A7A (sun60iw2p1) debug console: S_UART0 on PL6/PL7,
+	 * routed to 40-pin header pins 15/16 (3.3V, kernel UNCLAIMED).
+	 * Per A733 manual: PL6_SELECT 0011 = S-UART0-TX, PL7_SELECT 0011 = S-UART0-RX.
+	 */
+	pin_set_multi_sel(PIN_GRP_PL, 6, 3);
+	pin_set_multi_sel(PIN_GRP_PL, 7, 3);
+	uart_pin_not_used = 0;
 #else
 	if (uart_init_from_dts() < 0)
 		uart_pin_not_used = 1;
@@ -187,8 +215,9 @@ s32 uart_exit(void)
 	uart_lock = 1;
 	uart_pin_not_used = 1;
 
-	pin_set_multi_sel(PIN_GRP_PL, 2, 7);
-	pin_set_multi_sel(PIN_GRP_PL, 3, 7);
+	/* restore S_UART0 pins (PL6/PL7) to IO-disable */
+	pin_set_multi_sel(PIN_GRP_PL, 6, 7);
+	pin_set_multi_sel(PIN_GRP_PL, 7, 7);
 
 	/* set uart clock, open apb0 uart gating. */
 	ccu_set_mclk_onoff(CCU_MOD_CLK_R_UART, CCU_CLK_OFF);
@@ -219,6 +248,19 @@ s32 uart_putc(char ch)
 
 	return OK;
 }
+
+/*
+ * bp214: raw, lock-bypassing TX for the standby stage trail.
+ *
+ * The normal console is gated twice during a super-standby cycle:
+ * uart_lock is set by uart_clkchangecb(CLKCHG_REQ) at clk_suspend and is
+ * only cleared by the resume-side DONE, while the daemon's own output is
+ * suppressed by suspend_lock.  A wedged standby therefore left no trail
+ * at all (silent tio until the next power cycle).  These helpers write
+ * straight into the S_UART0 FIFO with a bounded wait and ignore both
+ * locks, so every save_state_flag() (the standby stage recorder) shows
+ * up live on the debug UART.
+ */
 
 /*
  * uart_getc() - get a charset.
@@ -278,9 +320,8 @@ s32 uart_set_baudrate(u32 rate)
 	LOG("uart buadrate change from [%d] to [%d]\n", uart_rate, rate);
 	uart_rate = rate;
 
-	/* wait uart transmit fifo empty */
-	while (readl(UART_REG_TFL))
-		continue;
+	/* wait uart transmit fifo empty (bounded, bp135) */
+	(void)uart_wait_tx_drained();
 
 	/* reconfig uart baudrate */
 #ifdef CFG_FPGA_PLATFORM
@@ -312,9 +353,14 @@ s32 uart_set_baudrate(u32 rate)
 	halt = readl(UART_REG_HALT) | 0x4;
 	writel(halt, UART_REG_HALT);
 
-	/* waiting update */
-	while (readl(UART_REG_HALT) & 0x4)
-		continue;
+	/* waiting update (bounded, bp135) */
+	{
+		unsigned int i;
+		for (i = 0; i < 20000U; i++) {
+			if (!(readl(UART_REG_HALT) & 0x4))
+				break;
+		}
+	}
 
 	/* disable change when busy */
 	halt = readl(UART_REG_HALT) | 0x4;

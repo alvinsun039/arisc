@@ -1,3 +1,9 @@
+/*
+ * A733 changes: Copyright (c) 2026 A733 contributors.
+ * These changes are provided under BSD-3-Clause (see LICENSE); the
+ * original file retains its upstream copyright and terms.
+ */
+
 /**
  * driver\hwmsgbox\hwmsgbox-extended\hwmsgbox-extended.c
  *
@@ -257,27 +263,34 @@ s32 hwmsgbox_query_message(struct message *pmessage, u32 timeout)
 	u32 i;
 	u32 value;
 
+	/* bp234: a frame whose tail never arrives (the peer wedged
+	 * mid-send on a full queue) used to spin here forever and wedge
+	 * the whole daemon pump - the second-suspend mailbox deadlock
+	 * observed with BOTH firmwares.  Bound every mid-frame wait and
+	 * drop a broken frame instead. */
+#define MSG_QUERY_WAIT(ch)						\
+	do {								\
+		if (hwmsgbox_wait_queue_not_empty((ch), 10) != OK)	\
+			goto query_timeout;				\
+	} while (0)
+
 	/* query ar100 asyn received channel */
 	if (!!readl(MSGBOX_ARM_TO_RISC_MSG_STATUS_REG(HWMSGBOX_RISC_ASYN_RX_CH))) {
-		LOG("query asyn msg\n");
 		/* first receive message header and misc */
-		while (!readl(MSGBOX_ARM_TO_RISC_MSG_STATUS_REG(HWMSGBOX_RISC_ASYN_RX_CH)))
-			;
+		MSG_QUERY_WAIT(HWMSGBOX_RISC_ASYN_RX_CH);
 		value = readl(MSGBOX_ARM_TO_RISC_MSG_REG(HWMSGBOX_RISC_ASYN_RX_CH));
 		pmessage->state = value & 0xff;
 		pmessage->attr = (value >> 8) & 0xff;
 		pmessage->type = (value >> 16) & 0xff;
 		pmessage->result = (value >> 24) & 0xff;
 
-		while (!readl(MSGBOX_ARM_TO_RISC_MSG_STATUS_REG(HWMSGBOX_RISC_ASYN_RX_CH)))
-			;
+		MSG_QUERY_WAIT(HWMSGBOX_RISC_ASYN_RX_CH);
 		value = readl(MSGBOX_ARM_TO_RISC_MSG_REG(HWMSGBOX_RISC_ASYN_RX_CH));
 		pmessage->count = value & 0xff;
 
 		/* then receive message paras */
 		for (i = 0; i < pmessage->count; i++) {
-			while (!readl(MSGBOX_ARM_TO_RISC_MSG_STATUS_REG(HWMSGBOX_RISC_ASYN_RX_CH)))
-				;
+			MSG_QUERY_WAIT(HWMSGBOX_RISC_ASYN_RX_CH);
 			pmessage->paras[i] = readl(MSGBOX_ARM_TO_RISC_MSG_REG(HWMSGBOX_RISC_ASYN_RX_CH));
 		}
 
@@ -288,25 +301,21 @@ s32 hwmsgbox_query_message(struct message *pmessage, u32 timeout)
 
 	/* query ar100 syn received channel */
 	if (!!readl(MSGBOX_ARM_TO_RISC_MSG_STATUS_REG(HWMSGBOX_ARM_SYN_TX_CH))) {
-		LOG("query syn msg\n");
 		/* first receive message header and misc */
-		while (!readl(MSGBOX_ARM_TO_RISC_MSG_STATUS_REG(HWMSGBOX_ARM_SYN_TX_CH)))
-			;
+		MSG_QUERY_WAIT(HWMSGBOX_ARM_SYN_TX_CH);
 		value = readl(MSGBOX_ARM_TO_RISC_MSG_REG(HWMSGBOX_ARM_SYN_TX_CH));
 		pmessage->state = value & 0xff;
 		pmessage->attr = (value >> 8) & 0xff;
 		pmessage->type = (value >> 16) & 0xff;
 		pmessage->result = (value >> 24) & 0xff;
 
-		while (!readl(MSGBOX_ARM_TO_RISC_MSG_STATUS_REG(HWMSGBOX_ARM_SYN_TX_CH)))
-			;
+		MSG_QUERY_WAIT(HWMSGBOX_ARM_SYN_TX_CH);
 		value = readl(MSGBOX_ARM_TO_RISC_MSG_REG(HWMSGBOX_ARM_SYN_TX_CH));
 		pmessage->count = value & 0xff;
 
 		/* then receive message paras */
 		for (i = 0; i < pmessage->count; i++) {
-			while (!readl(MSGBOX_ARM_TO_RISC_MSG_STATUS_REG(HWMSGBOX_ARM_SYN_TX_CH)))
-				;
+			MSG_QUERY_WAIT(HWMSGBOX_ARM_SYN_TX_CH);
 			pmessage->paras[i] = readl(MSGBOX_ARM_TO_RISC_MSG_REG(HWMSGBOX_ARM_SYN_TX_CH));
 		}
 
@@ -316,6 +325,13 @@ s32 hwmsgbox_query_message(struct message *pmessage, u32 timeout)
 	}
 
 	/* no valid message */
+	return FAIL;
+
+query_timeout:
+	/* bp234: broken/partial frame - drop everything queued and let the
+	 * caller continue instead of spinning forever. */
+	hwmsgbox_clear_receiver_pending(HWMSGBOX_RISC_ASYN_RX_CH);
+	hwmsgbox_clear_receiver_pending(HWMSGBOX_ARM_SYN_TX_CH);
 	return FAIL;
 }
 

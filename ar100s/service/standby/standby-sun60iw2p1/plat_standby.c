@@ -1,4 +1,10 @@
 /*
+ * A733 changes: Copyright (c) 2026 A733 contributors.
+ * These changes are provided under BSD-3-Clause (see LICENSE); the
+ * original file retains its upstream copyright and terms.
+ */
+
+/*
 *********************************************************************************************************
 *                                                AR100 SYSTEM
 *                                     AR100 Software System Develop Kits
@@ -943,6 +949,15 @@ static void bus_clock_ctl(enum bus_clock_mode mode, enum bus_clock_mode control)
 
 static void clk_suspend(void)
 {
+	/* bp150: notify peripherals BEFORE switching the source clocks.
+	 * The REQ printouts then go out at the correct baud rate, the
+	 * locks silence the switch window (and any residual FIFO bytes are
+	 * drained by the REQ handlers), and the DONE path recomputes the
+	 * dividers - no more 10s of UART garble on suspend entry. */
+	LOG("clk_suspend\n");
+	twi_clkchangecb(CCU_CLK_CLKCHG_REQ, iosc_freq);
+	uart_clkchangecb(CCU_CLK_CLKCHG_REQ, iosc_freq);
+
 	/* change the rv 24m to 16k */
 	writel(RV_CLK_16M, RV_24M_CLK_REG);
 	/* set ahb apb0 apb1 cpus(ahb) apbs0 clk to RC16M, clear factor m */
@@ -954,15 +969,10 @@ static void clk_suspend(void)
 	/* close trace and gic clock source */
 	bus_clock_ctl(rc16m, gic_tra_clk);
 
-	LOG("clk_suspend\n");
-
 	/*
 	 * set apbs1 clk to RC16M, clear factor m
 	 * then change the baudrate of uart and twi...
 	 */
-	twi_clkchangecb(CCU_CLK_CLKCHG_REQ, iosc_freq);
-	uart_clkchangecb(CCU_CLK_CLKCHG_REQ, iosc_freq);
-	/* close prcm cpus apbs1 apbs2 clk to RC16M, clear factor m */
 	bus_clock_set(rc16m, prcm_clk);
 	time_mdelay(10);
 	uart_clkchangecb(CCU_CLK_CLKCHG_DONE, iosc_freq);
